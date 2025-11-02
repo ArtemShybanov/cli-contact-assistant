@@ -87,3 +87,20 @@ def validate_email(value: str) -> str:
         raise typer.BadParameter("Invalid email format")
     return value
 
+import re
+
+_TAG_RE = re.compile(r"^[a-z0-9_-]{1,32}$")
+
+def normalize_tag(tag: str) -> str:
+    # trim → collapse spaces → lowercase
+    return " ".join(tag.strip().split()).lower()
+
+def is_valid_tag(tag: str) -> bool:
+    # empty tags already handled in normalize_tag
+    return bool(tag) and bool(_TAG_RE.match(tag))
+
+def split_tags_string(s: str) -> list[str]:
+    # "ai, ML ,  python" -> ["ai", "ML", "python"] (without normalization)
+    if not s:
+        return []
+    return [p for p in (part.strip() for part in s.split(",")) if p]
