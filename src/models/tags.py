@@ -1,7 +1,11 @@
 from __future__ import annotations
+
 from typing import Iterable, List
+
+from src.utils.validators import is_valid_tag, normalize_tag
+
 from .field import Field
-from src.utils.validators import normalize_tag, is_valid_tag
+
 
 class Tags(Field):
     """Domain field holding a normalized, unique list of tags (lowercase)."""

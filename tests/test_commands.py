@@ -90,7 +90,7 @@ class TestAddCommand:
             result = runner.invoke(app, ["add", "John", "invalid"])
             
         assert result.exit_code == 2
-        output = result.stdout + result.stderr
+        output = result.output
         assert "Invalid value" in output or "must contain only digits" in output
         mock_service.add_contact.assert_not_called()
     
@@ -100,7 +100,7 @@ class TestAddCommand:
             result = runner.invoke(app, ["add", "John", "123"])
             
         assert result.exit_code == 2
-        output = result.stdout + result.stderr
+        output = result.output
         assert "Invalid value" in output or "must be exactly 10 digits" in output
         mock_service.add_contact.assert_not_called()
     
@@ -137,7 +137,7 @@ class TestChangeCommand:
             result = runner.invoke(app, ["change", "John", "invalid", "0987654321"])
             
         assert result.exit_code == 2
-        output = result.stdout + result.stderr
+        output = result.output
         assert "Invalid value" in output or "must contain only digits" in output
         mock_service.change_contact.assert_not_called()
     
@@ -147,7 +147,7 @@ class TestChangeCommand:
             result = runner.invoke(app, ["change", "John", "1234567890", "123"])
             
         assert result.exit_code == 2
-        output = result.stdout + result.stderr
+        output = result.output
         assert "Invalid value" in output or "must be exactly 10 digits" in output
         mock_service.change_contact.assert_not_called()
     
@@ -233,7 +233,7 @@ class TestAddBirthdayCommand:
             result = runner.invoke(app, ["add-birthday", "John", "invalid"])
             
         assert result.exit_code == 2
-        output = result.stdout + result.stderr
+        output = result.output
         assert "Invalid value" in output or "Invalid date format" in output
         mock_service.add_birthday.assert_not_called()
     
@@ -243,7 +243,7 @@ class TestAddBirthdayCommand:
             result = runner.invoke(app, ["add-birthday", "John", "32.13.2020"])
             
         assert result.exit_code == 2
-        output = result.stdout + result.stderr
+        output = result.output
         assert "Invalid value" in output or "Invalid date format" in output
         mock_service.add_birthday.assert_not_called()
     

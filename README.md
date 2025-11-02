@@ -48,6 +48,7 @@ Python 3.10 or higher required
 - **Type hints** throughout codebase
 - **Pickle-based persistence** with automatic serialization
 - **Comprehensive documentation** with examples
+- Tagging: per-contact tags, tag-based search (AND/OR), and tag-aware sorting
 
 ## Installation
 
@@ -114,6 +115,24 @@ python src/main.py add-birthday "John Doe" 15.05.1990
 # Show upcoming birthdays
 python src/main.py birthdays
 ```
+### Tags
+
+Rules: tags are lowercase, unique per contact; allowed `[a-z0-9_-]`, length `1..32`.
+
+```bash
+# CRUD
+python src/main.py tag-add "John Doe" ml
+python src/main.py tag-list "John Doe"
+python src/main.py tag-remove "John Doe" ml
+python src/main.py tag-clear "John Doe"
+
+# Search
+python src/main.py find-by-tags "ai,ml"        # AND
+python src/main.py find-by-tags-any "ai,ml"    # OR
+
+# List sorting by tags
+python src/main.py all --sort-by tag_count
+python src/main.py all --sort-by tag_name
 
 ## Available Commands
 
@@ -127,6 +146,12 @@ python src/main.py birthdays
 | `add-birthday` | name, birthday (DD.MM.YYYY) | Add a birthday date to a contact |
 | `show-birthday` | name | Show the birthday date for a contact |
 | `birthdays` | None | Show all upcoming birthdays for the next week |
+| `tag-add`            | name, tag                             | Add a tag to a contact                                   |
+| `tag-remove`         | name, tag                             | Remove a tag from a contact                              |
+| `tag-list`           | name                                  | List tags of a contact                                   |
+| `tag-clear`          | name                                  | Clear all tags for a contact                             |
+| `find-by-tags`       | "t1,t2"                               | Find contacts that have **ALL** tags (AND)               |
+| `find-by-tags-any`   | "t1,t2"                               | Find contacts that have **ANY** tag (OR)                 |
 | `interactive` | None | Start interactive REPL mode |
 
 ## Project Structure
@@ -150,7 +175,10 @@ python src/main.py birthdays
 │   │   ├── add_birthday.py        # Add birthday command
 │   │   ├── show_birthday.py       # Show birthday command
 │   │   ├── birthdays.py           # Show upcoming birthdays command
-│   │   └── hello.py               # Greeting command
+│   │   ├── hello.py               # Greeting command
+│   │   ├── tags.py                # Tag CRUD commands
+│   │   ├── find_by_tags.py        # AND search by tags
+│   │   └── find_by_tags_any.py    # OR search by tags
 │   ├── models/                    # Data models with validation and serialization
 │   │   ├── __init__.py
 │   │   ├── field.py               # Base field class
@@ -158,6 +186,7 @@ python src/main.py birthdays
 │   │   ├── phone.py               # Phone field with validation
 │   │   ├── birthday.py            # Birthday field with validation
 │   │   ├── record.py              # Contact record
+│   │   ├── tags.py                # Tags value object (normalize/validate, set ops)
 │   │   └── address_book.py        # Address book with persistence
 │   ├── services/                  # Business logic services
 │   │   ├── __init__.py
@@ -317,6 +346,7 @@ Complete contact information with name, phones list, and optional birthday.
 - `name: Name` - Contact's name (required)
 - `phones: list[Phone]` - List of phone numbers (can be empty)
 - `birthday: Optional[Birthday]` - Contact's birthday (optional)
+- `tags: Tags` — contact tags container
 
 **Methods:**
 - `add_phone(phone: str) -> None` - Add a phone number
@@ -324,9 +354,25 @@ Complete contact information with name, phones list, and optional birthday.
 - `edit_phone(old_phone: str, new_phone: str) -> None` - Edit an existing phone number
 - `find_phone(phone: str) -> Optional[Phone]` - Find a specific phone number
 - `add_birthday(birthday: str) -> None` - Add a birthday in DD.MM.YYYY format
+- `set_tags(tags: list[str] | str) -> None`
+- `add_tag(tag: str) -> None`
+- `remove_tag(tag: str) -> None`
+- `clear_tags() -> None`
+- `tags_list() -> list[str]`
+
+**Backward compatibility:**
+- Older pickles without `tags` are supported (added at load time).
 
 **String Representation:**
 Returns formatted string: `"Contact name: {name}, phones: {phones}, birthday: {birthday}"`
+
+### Tags
+Value object that stores a normalized, unique set of tags.
+
+- Normalization: lowercase + trim
+- Allowed charset: `[a-z0-9_-]`
+- Length: `1..32`
+- API: `add`, `remove`, `replace`, `clear`, `as_list`
 
 ### AddressBook
 Stores and manages contact records (extends UserDict for dictionary-like interface).
@@ -368,6 +414,20 @@ Service layer encapsulating all business logic for contact operations. Injected 
 
 - `get_all_contacts() -> str` - Get all contacts as formatted string
   - Returns: Formatted string with all contacts or "Address book is empty"
+
+**Tag Management:**
+- `add_tag(name: str, tag: str) -> str`
+- `remove_tag(name: str, tag: str) -> str`
+- `clear_tags(name: str) -> str`
+- `list_tags(name: str) -> list[str]`
+
+**Tag Search:**
+- `find_by_tags_all(tags: list[str] | str) -> list[tuple[name, Record]]` — AND
+- `find_by_tags_any(tags: list[str] | str) -> list[tuple[name, Record]]` — OR
+
+**Listing with sorting:**
+- `list_contacts(sort_by: Optional[str]) -> list[tuple[name, Record]]`  
+  `sort_by ∈ { "tag_count", "tag_name", None }`
 
 **Birthday Management:**
 - `add_birthday(name: str, birthday: str) -> str` - Add birthday to contact
@@ -535,6 +595,11 @@ Input validation happens at the CLI parameter level using validators from `src/u
 3. **Email addresses** (`validate_email`):
    - Must contain `@` and `.`
    - Basic format validation (ready for future use)
+
+4. **Tags**:
+   - Allowed pattern: `^[a-z0-9_-]{1,32}$`
+   - Normalized to lowercase
+   - Duplicates removed per contact
 
 **Benefits:**
 - Users immediately see which parameter is invalid
