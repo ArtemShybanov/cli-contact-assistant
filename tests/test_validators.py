@@ -12,6 +12,9 @@ from src.utils.validators import (
     validate_birthday,
     validate_email,
 )
+from src.utils.validators import validate_phone, validate_birthday, validate_email
+from src.utils.validators import split_tags_string
+
 
 class TestPhoneValidator:
     def test_validate_phone_valid_local_10_digits(self):
@@ -91,3 +94,21 @@ class TestEmailValidator:
                 validate_email(bad)
             msg = str(exc.value).lower()
             assert any(s in msg for s in ["invalid email", "must not", "empty"])
+# Additional tests for tag splitting utility
+class TestTagSplitting:
+    """Tests for tag splitting utility."""
+
+    def test_split_tags_string_basic(self):
+        assert split_tags_string("ml, ai ,python") == ["ml", "ai", "python"]
+
+    def test_split_tags_string_quoted_comma(self):
+        assert split_tags_string('"ml,ai", data') == ["ml,ai", "data"]
+
+    def test_split_tags_string_spaces_only(self):
+        assert split_tags_string("   ") == []
+
+    def test_split_tags_string_empty(self):
+        assert split_tags_string("") == []
+
+    def test_split_tags_string_quotes_and_spaces(self):
+        assert split_tags_string('  "a,b" ,  c  ') == ["a,b", "c"]
