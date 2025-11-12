@@ -7,7 +7,7 @@ separation of concerns and dependency injection support.
 
 from datetime import datetime, timedelta
 from typing import Dict, Iterable, List, Optional, Tuple, Any
-
+from typing import Callable, Any, Tuple 
 from src.models.address_book import AddressBook
 from src.models.record import Record
 from src.models.tags import Tags
