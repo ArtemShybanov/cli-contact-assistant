@@ -82,6 +82,7 @@ python src/main.py birthdays
 - **click-repl** (>=0.3) - REPL plugin for Click
 - **rich** (>=13.7) - Beautiful terminal formatting
 - **dependency-injector** (>=4.41) - Dependency injection framework
+- **phonenumbers** (>=8.13) - International phone number parsing and formatting
 - **pytest** (>=8.0.0) - Testing framework
 - **pytest-cov** (>=4.0.0) - Test coverage plugin
 - **coverage-badge** (>=1.1.0) - Generate coverage badges
@@ -110,8 +111,10 @@ Execute single commands directly:
 # View all commands
 python src/main.py --help
 
-# Add a contact
-python src/main.py add "John Doe" 1234567890
+# Add a contact (flexible phone formats accepted)
+python src/main.py add "John Doe" 067-235-5960
+python src/main.py add "John Doe" +380 67 235 5960
+python src/main.py add "John Doe" 00380672355960
 
 # Show all contacts
 python src/main.py all
@@ -389,12 +392,21 @@ Contact name field (inherits from Field).
 **Validation:** Cannot be empty or contain only whitespace.
 
 ### Phone
-Phone number field with validation (inherits from Field).
+Phone number field with international parsing and formatting (inherits from Field).
 
 **Attributes:**
-- `value: str` - Phone number (exactly 10 digits)
+- `value: str` - Canonical E.164 format (e.g., `+380672355960`)
+- `country_code: int` - Country code (e.g., `380` for Ukraine)
+- `national_number: int` - National number without country code
+- `display_value: str` - Human-readable international format (e.g., `+380 67 235 5960`)
+- `display_value_national: str` - National format (e.g., `067 235 5960`)
 
-**Validation:** Must be exactly 10 digits containing only numeric characters.
+**Validation:** 
+- Accepts flexible input formats (with/without country code, spaces, dashes, parentheses)
+- Defaults to Ukraine (+380) if no country code provided
+- Uses `phonenumbers` library for parsing and validation
+- Stores canonical E.164 format internally
+- Displays formatted numbers in international format by default
 
 ### Birthday
 Birthday field with date validation (inherits from Field).
@@ -576,7 +588,10 @@ The address book supports **contact groups** (for example: `personal`, `work`, `
 CLI parameter validators used as Typer callbacks for input validation at the parameter level.
 
 **Available Validators:**
-- `validate_phone(value: str) -> str` - Validates phone number format (exactly 10 digits)
+- `validate_phone(value: str) -> str` - Validates and normalizes phone number (flexible input formats)
+  - Accepts: local formats (e.g., `067-235-5960`), international formats (e.g., `+380 67 235 5960`), with/without country code
+  - Returns: Canonical E.164 format (e.g., `+380672355960`)
+  - Defaults to Ukraine (+380) if no country code provided
   - Raises: `typer.BadParameter` with user-friendly message
 
 - `validate_birthday(value: str) -> str` - Validates birthday date format (DD.MM.YYYY)
@@ -696,8 +711,10 @@ The assistant bot implements two-tier validation for robust data integrity:
 Input validation happens at the CLI parameter level using validators from `src/utils/validators.py`:
 
 1. **Phone numbers** (`validate_phone`):
-   - Must be exactly 10 digits
-   - Must contain only numeric characters
+   - Accepts flexible formats: local (e.g., `067-235-5960`), international (e.g., `+380 67 235 5960`), with spaces/dashes/parentheses
+   - Automatically normalizes to E.164 format (e.g., `+380672355960`)
+   - Defaults to Ukraine (+380) if no country code provided
+   - Validates using `phonenumbers` library for international support
    - Error shows which parameter failed: `Invalid value for 'PHONE': ...`
 
 2. **Birthday dates** (`validate_birthday`):
@@ -724,7 +741,7 @@ Additional validation happens at the model level for data integrity:
 
 1. **Field class**: Base validation for all field types
 2. **Name field**: Cannot be empty or contain only whitespace
-3. **Phone field**: Validates 10-digit format (defense in depth)
+3. **Phone field**: Validates and normalizes phone numbers using `phonenumbers` library (defense in depth)
 4. **Birthday field**: Validates DD.MM.YYYY format and parses to datetime
 5. **Record class**: 
    - Prevents duplicate phones
@@ -786,6 +803,20 @@ This logic lives in:
 
 No manual migration steps are required – just run the updated application and the data will be upgraded in memory before the next save.
 
+### Phone number migration (backward compatibility)
+
+Existing `addressbook.pkl` files created **before** flexible phone formatting was implemented are migrated automatically when loaded:
+
+- Old phone numbers stored as 10-digit strings (e.g., `"1234567890"`) are automatically converted to the new `Phone` model with E.164 format (e.g., `+3801234567890`)
+- Phone numbers are normalized and formatted during migration
+- All phone operations (add, remove, edit, find) now work with flexible input formats while maintaining compatibility with old data
+
+This logic lives in:
+- `Record.__setstate__` – migrates old phone strings/objects to new `Phone` instances with proper normalization
+- `Phone.__init__` – handles parsing of various input formats and defaults to Ukraine (+380) when no country code is present
+
+No manual migration steps are required – just run the updated application and phone numbers will be upgraded automatically.
+
 
 ## Examples
 
@@ -803,7 +834,7 @@ $ python src/main.py
 │   • ...                                     │
 ╰─────────────────────────────────────────────╯
 
-> add John 1234567890
+> add John 067-235-5960
 Contact added.
 
 > add-birthday John 15.05.1990
@@ -811,7 +842,7 @@ Birthday added.
 
 > all
 ╭────────────── All Contacts ──────────────╮
-│ Contact name: John, phones: 1234567890,  │
+│ Contact name: John, phones: +380 67 235 5960,  │
 │ birthday: 15.05.1990                     │
 ╰──────────────────────────────────────────╯
 
@@ -822,9 +853,10 @@ Good bye!
 ### Command-Line Mode
 
 ```bash
-# Add contacts
-python src/main.py add Alice 5551234567
-python src/main.py add Bob 5559876543
+# Add contacts (flexible phone formats)
+python src/main.py add Alice +1 555-123-4567
+python src/main.py add Bob 067-235-5960
+python src/main.py add Charlie +380 50 123 4567
 
 # Add birthdays
 python src/main.py add-birthday Alice 10.03.1995
@@ -974,7 +1006,7 @@ def add_command(
 
 **Available validators:** `validate_phone`, `validate_birthday`, `validate_email`
 
-Users see which parameter failed: `Invalid value for 'PHONE': Phone number must be exactly 10 digits`
+Users see which parameter failed: `Invalid value for 'PHONE': Invalid phone number: ...` or `Phone number is not possible: ...`
 
 **2. Error Handling (Decorator)**
 
