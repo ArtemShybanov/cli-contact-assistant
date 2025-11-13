@@ -26,7 +26,7 @@ from src.services.contact_service import ContactService
 app = typer.Typer(
     name="assistant-bot",
     help="Console bot assistant for managing contacts with names, phone numbers, and birthdays.",
-    add_completion=False,
+    add_completion=True,
 )
 console = Console()
 
@@ -126,16 +126,32 @@ def auto_register_commands():
     # so that the inner @inject functions can access the container
     if not _container_wired and module_names:
         try:
-            container.wire(modules=module_names)
+            # Wire command modules + utility modules that use DI
+            all_modules = module_names + [
+                "src.utils.autocomplete",  # Autocomplete uses @inject for service resolution
+                "src.utils.progressive_params",  # Progressive params uses lazy service resolution
+            ]
+            container.wire(modules=all_modules)
             _container_wired = True
         except Exception as e:
             # If wiring fails, commands can still work by calling inner functions directly
             console.print(f"[yellow]Warning: Failed to wire container: {e}[/yellow]")
     
     # Step 3: Mount all command apps to the main app
-    for module in module_objects:
+    for idx, module in enumerate(module_objects):
         try:
-            app.add_typer(module.app, name="")
+            module_name = module_names[idx].split('.')[-1]  # Get the module name
+            
+            # Special handling for command groups (subcommands)
+            if module_name == "notes":
+                # Register as subcommand group: notes add, notes edit, etc.
+                app.add_typer(module.app, name="notes")
+            elif module_name == "search":
+                # Register as subcommand group: search contacts, search notes, search menu
+                app.add_typer(module.app, name="search")
+            else:
+                # Register commands at root level
+                app.add_typer(module.app, name="")
         except Exception as e:
             console.print(f"[yellow]Warning: Failed to mount command app: {e}[/yellow]")
     
@@ -148,12 +164,20 @@ def interactive():
     Start interactive REPL mode.
     """
     from click_repl import repl
-    from click import Context, prompt
+    from click import Context
+    from src.utils.repl_completer import create_context_aware_completer_for_repl
     
     _print_welcome_panel()
 
     ctx = Context(typer.main.get_command(app))
-    prompt_kwargs = {"message": _make_group_prompt}
+    
+    # Create context-aware completer that fixes parameter positioning
+    custom_completer = create_context_aware_completer_for_repl(ctx)
+    
+    prompt_kwargs = {
+        "message": _make_group_prompt,
+        "completer": custom_completer
+    }
 
     try:
         repl(ctx, prompt_kwargs=prompt_kwargs)
@@ -171,11 +195,19 @@ def run_interactive():
     auto_register_commands()
     from click_repl import repl
     from click import Context
+    from src.utils.repl_completer import create_context_aware_completer_for_repl
 
     _print_welcome_panel()
 
     ctx = Context(typer.main.get_command(app))
-    prompt_kwargs = {"message": _make_group_prompt}
+    
+    # Create context-aware completer that fixes parameter positioning
+    custom_completer = create_context_aware_completer_for_repl(ctx)
+    
+    prompt_kwargs = {
+        "message": _make_group_prompt,
+        "completer": custom_completer
+    }
 
     try:
         repl(ctx, prompt_kwargs=prompt_kwargs)
