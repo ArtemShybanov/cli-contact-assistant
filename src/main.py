@@ -24,7 +24,7 @@ from src.container import Container
 app = typer.Typer(
     name="assistant-bot",
     help="Console bot assistant for managing contacts with names, phone numbers, and birthdays.",
-    add_completion=False,
+    add_completion=True,
 )
 console = Console()
 
@@ -75,16 +75,32 @@ def auto_register_commands():
     # so that the inner @inject functions can access the container
     if not _container_wired and module_names:
         try:
-            container.wire(modules=module_names)
+            # Wire command modules + utility modules that use DI
+            all_modules = module_names + [
+                "src.utils.autocomplete",  # Autocomplete uses @inject for service resolution
+                "src.utils.progressive_params",  # Progressive params uses lazy service resolution
+            ]
+            container.wire(modules=all_modules)
             _container_wired = True
         except Exception as e:
             # If wiring fails, commands can still work by calling inner functions directly
             console.print(f"[yellow]Warning: Failed to wire container: {e}[/yellow]")
     
     # Step 3: Mount all command apps to the main app
-    for module in module_objects:
+    for idx, module in enumerate(module_objects):
         try:
-            app.add_typer(module.app, name="")
+            module_name = module_names[idx].split('.')[-1]  # Get the module name
+            
+            # Special handling for command groups (subcommands)
+            if module_name == "notes":
+                # Register as subcommand group: notes add, notes edit, etc.
+                app.add_typer(module.app, name="notes")
+            elif module_name == "search":
+                # Register as subcommand group: search contacts, search notes, search menu
+                app.add_typer(module.app, name="search")
+            else:
+                # Register commands at root level
+                app.add_typer(module.app, name="")
         except Exception as e:
             console.print(f"[yellow]Warning: Failed to mount command app: {e}[/yellow]")
     
@@ -115,9 +131,13 @@ def interactive():
         "  • [cyan]tag-remove[/cyan] [name] [tag] - Remove a tag\n"
         "  • [cyan]tag-clear[/cyan] [name] - Clear all tags\n"
         "  • [cyan]tag-list[/cyan] [name] - List tags of a contact\n"
-        "  • [cyan]find-by-tags[/cyan] [TAGS...] - Find contacts with ALL tags (AND)\n"
-        "      e.g. find-by-tags ml \"data,science\"\n"
-        "  • [cyan]find-by-tags-any[/cyan] [TAGS...] - Find contacts with ANY tag (OR)\n"
+        "  • [cyan]search[/cyan] [SUBCOMMAND] - Search contacts and notes\n"
+        "      e.g. search menu - Interactive search\n"
+        "      e.g. search contacts \"john\" --by=name\n"
+        "      e.g. search notes \"meeting\" --by=text\n"
+        "  • [cyan]notes[/cyan] [SUBCOMMAND] - Manage notes (add, list, show, edit, delete, tag-*, menu)\n"
+        "      e.g. notes add John \"meeting\" \"Discuss project\"\n"
+        "      e.g. notes menu - Interactive notes management\n"
         "  • [cyan]exit[/cyan] or [cyan]quit[/cyan] - Exit the program\n",
         title="[bold]Assistant Bot[/bold]",
         border_style="green"
@@ -156,19 +176,40 @@ def run_interactive():
         "  • [cyan]tag-remove[/cyan] [name] [tag] - Remove a tag\n"
         "  • [cyan]tag-clear[/cyan] [name] - Clear all tags\n"
         "  • [cyan]tag-list[/cyan] [name] - List tags of a contact\n"
-        "  • [cyan]find-by-tags[/cyan] [TAGS...] - Find contacts with ALL tags (AND)\n"
-        "      e.g. find-by-tags ml \"data,science\"\n"
-        "  • [cyan]find-by-tags-any[/cyan] [TAGS...] - Find contacts with ANY tag (OR)\n"
+        "  • [cyan]search[/cyan] [SUBCOMMAND] - Search contacts and notes\n"
+        "      e.g. search menu - Interactive search\n"
+        "      e.g. search contacts \"john\" --by=name\n"
+        "      e.g. search notes \"meeting\" --by=text\n"
+        "  • [cyan]notes[/cyan] [SUBCOMMAND] - Manage notes (add, list, show, edit, delete, tag-*, menu)\n"
+        "      e.g. notes add John \"meeting\" \"Discuss project\"\n"
+        "      e.g. notes menu - Interactive notes management\n"
         "  • [cyan]exit[/cyan] or [cyan]quit[/cyan] - Exit the program\n",
         title="[bold]Assistant Bot[/bold]",
         border_style="green"
     ))
     
     try:
-        from click_repl import repl
+        from click_repl import repl, ClickCompleter
         from click import Context
-        ctx = Context(typer.main.get_command(app))
-        repl(ctx)
+        from prompt_toolkit.history import InMemoryHistory
+        from src.utils.repl_completer import create_context_aware_completer
+        
+        # Get the Click command from Typer app
+        cli = typer.main.get_command(app)
+        ctx = Context(cli)
+        
+        # Create custom context-aware completer
+        # This fixes multi-level command parameter position tracking
+        original_completer = ClickCompleter(cli, ctx)
+        context_aware_completer = create_context_aware_completer(original_completer, ctx)
+        
+        # Configure REPL with custom completer
+        prompt_kwargs = {
+            'history': InMemoryHistory(),
+            'completer': context_aware_completer,
+        }
+        
+        repl(ctx, prompt_kwargs=prompt_kwargs)
     except (EOFError, KeyboardInterrupt):
         console.print("\n[bold green]Good bye![/bold green]")
 

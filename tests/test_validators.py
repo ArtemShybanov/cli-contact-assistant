@@ -51,6 +51,21 @@ class TestPhoneValidator:
     def test_validate_phone_too_long_not_reducible(self):
         with pytest.raises(typer.BadParameter):
             validate_phone("9999999999999")
+    
+    def test_validate_phone_empty(self):
+        """Test phone validator rejects empty string."""
+        with pytest.raises(typer.BadParameter, match="empty"):
+            validate_phone("")
+    
+    def test_validate_phone_only_non_digits_after_cleanup(self):
+        """Test phone validator rejects strings with no digits."""
+        with pytest.raises(typer.BadParameter, match="must contain digits"):
+            validate_phone("---+++")
+    
+    def test_validate_phone_ua_international_12_digits_with_all_same(self):
+        """Test UA international format with all identical digits."""
+        with pytest.raises(typer.BadParameter, match="identical"):
+            validate_phone("380000000000")
 
 class TestBirthdayValidator:
     def test_validate_birthday_valid(self):

@@ -59,6 +59,18 @@ def mock_service():
     return service
 
 
+@pytest.fixture
+def mock_record():
+    """Create a mock record for testing."""
+    from src.models.phone import Phone
+    record = Mock()
+    record.phones = [Phone("1234567890")]
+    record.birthday = None
+    record.tags_list.return_value = []
+    record.list_notes.return_value = []
+    return record
+
+
 class TestHelloCommand:
     """Tests for hello command."""
     
@@ -190,10 +202,10 @@ class TestPhoneCommand:
 class TestAllCommand:
     """Tests for all command."""
     
-    def test_all_with_contacts(self, mock_service):
+    def test_all_with_contacts(self, mock_service, mock_record):
         """Test showing all contacts without sorting."""
         mock_service.has_contacts.return_value = True
-        mock_service.get_all_contacts.return_value = "Contact name: John, phones: 1234567890"
+        mock_service.list_contacts.return_value = [("John", mock_record)]
         
         with container.contact_service.override(mock_service):
             result = runner.invoke(app, ["all"])
@@ -201,12 +213,12 @@ class TestAllCommand:
         assert result.exit_code == 0
         assert "John" in result.stdout
         # important: default sort_by=None
-        mock_service.get_all_contacts.assert_called_once_with(sort_by=None)
+        mock_service.list_contacts.assert_called_once_with(sort_by=None)
     
-    def test_all_with_sort_by_name(self, mock_service):
+    def test_all_with_sort_by_name(self, mock_service, mock_record):
         """Test showing all contacts with sort-by=name."""
         mock_service.has_contacts.return_value = True
-        mock_service.get_all_contacts.return_value = "Contact name: John, phones: 1234567890"
+        mock_service.list_contacts.return_value = [("John", mock_record)]
         
         with container.contact_service.override(mock_service):
             result = runner.invoke(app, ["all", "--sort-by", "name"])
@@ -214,7 +226,7 @@ class TestAllCommand:
         assert result.exit_code == 0
         assert "John" in result.stdout
         # Typer converts "name" -> ContactSortBy.NAME
-        mock_service.get_all_contacts.assert_called_once_with(
+        mock_service.list_contacts.assert_called_once_with(
             sort_by=ContactSortBy.NAME
         )
     
@@ -227,7 +239,7 @@ class TestAllCommand:
             
         assert result.exit_code == 0
         assert "Address book is empty." in result.stdout
-        mock_service.get_all_contacts.assert_not_called()
+        mock_service.list_contacts.assert_not_called()
 
 
 class TestAddBirthdayCommand:
@@ -307,7 +319,23 @@ class TestBirthdaysCommand:
     
     def test_birthdays_with_upcoming(self, mock_service):
         """Test showing upcoming birthdays."""
-        mock_service.get_upcoming_birthdays.return_value = "John: 15.05.2024"
+        from datetime import datetime, timedelta
+        
+        # Create mock record with birthday in next 7 days
+        record = Mock()
+        today = datetime.today().date()
+        bday_in_5_days_dt = datetime.combine(today + timedelta(days=5), datetime.min.time())
+        
+        # Mock birthday object with date property
+        mock_birthday = Mock()
+        mock_birthday.date = bday_in_5_days_dt.replace(year=2000)  # datetime object
+        mock_birthday.value = bday_in_5_days_dt.strftime("%d.%m.2000")
+        mock_birthday.__str__ = Mock(return_value=bday_in_5_days_dt.strftime("%d.%m.2000"))
+        
+        record.birthday = mock_birthday
+        record.phones = []
+        
+        mock_service.list_contacts.return_value = [("John", record)]
         
         with container.contact_service.override(mock_service):
             result = runner.invoke(app, ["birthdays"])
@@ -317,7 +345,8 @@ class TestBirthdaysCommand:
     
     def test_birthdays_none(self, mock_service):
         """Test showing birthdays when none upcoming."""
-        mock_service.get_upcoming_birthdays.return_value = "No upcoming birthdays in the next week."
+        # Return empty list (no contacts with birthdays)
+        mock_service.list_contacts.return_value = []
         
         with container.contact_service.override(mock_service):
             result = runner.invoke(app, ["birthdays"])

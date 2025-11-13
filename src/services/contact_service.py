@@ -7,29 +7,32 @@ separation of concerns and dependency injection support.
 
 from datetime import datetime, timedelta
 from typing import Dict, Iterable, List, Optional, Tuple, Any
+from enum import Enum
+from typing import Callable
 
 from src.models.address_book import AddressBook
 from src.models.record import Record
 from src.models.tags import Tags
 from src.utils.validators import is_valid_tag, normalize_tag, split_tags_string
-from enum import Enum
 
-#--- Contact sorting options ---
+
 class ContactSortBy(str, Enum):
-    '''
-        Enum for contact sorting criteria.
-        Attributes:
-            NAME: Sort by contact name
-            PHONE: Sort by phone number
-            BIRTHDAY: Sort by birthday date
-            TAG_COUNT: Sort by number of tags
-            TAG_NAME: Sort by tag names
-    '''
+    """
+    Enum for contact sorting criteria.
+    
+    Attributes:
+        NAME: Sort by contact name
+        PHONE: Sort by phone number
+        BIRTHDAY: Sort by birthday date
+        TAG_COUNT: Sort by number of tags
+        TAG_NAME: Sort by tag names
+    """
     NAME = "name"
     PHONE = "phone"
     BIRTHDAY = "birthday"    
     TAG_COUNT = "tag_count"
     TAG_NAME = "tag_name"
+
 
 class ContactService:
     """
@@ -324,11 +327,16 @@ class ContactService:
     def add_tag(self, name: str, tag: str) -> str:
         """
         Add a tag to a contact.
+        
         Args:
             name: Contact name
             tag: Tag to add
+            
         Returns:
             Success message
+            
+        Raises:
+            ValueError: If contact not found or tag invalid
         """
         record = self.address_book.find(name)
         if record is None:
@@ -344,9 +352,16 @@ class ContactService:
     def remove_tag(self, name: str, tag: str) -> str:
         """
         Remove a tag from a contact.
+        
         Args:
             name: Contact name
             tag: Tag to remove
+            
+        Returns:
+            Success message
+            
+        Raises:
+            ValueError: If contact not found
         """
         record = self.address_book.find(name)
         if record is None:
@@ -359,8 +374,15 @@ class ContactService:
     def clear_tags(self, name: str) -> str:
         """
         Clear all tags from a contact.
+        
         Args:
             name: Contact name
+            
+        Returns:
+            Success message
+            
+        Raises:
+            ValueError: If contact not found
         """
         record = self.address_book.find(name)
         if record is None:
@@ -372,8 +394,15 @@ class ContactService:
     def list_tags(self, name: str) -> list[str]:
         """
         List all tags for a contact.
+        
         Args:
             name: Contact name
+            
+        Returns:
+            List of tag strings
+            
+        Raises:
+            ValueError: If contact not found
         """
         record = self.address_book.find(name)
         if record is None:
@@ -382,12 +411,30 @@ class ContactService:
 
     # --- helpers ---
     def _iter_name_record(self) -> Iterable[Tuple[str, "Record"]]:
+        """
+        Iterate over all contact name-record pairs.
+        
+        Returns:
+            Iterator of (name, record) tuples
+        """
         book = self.address_book
         if hasattr(book, "data") and isinstance(book.data, dict):
             return book.data.items()
         raise RuntimeError("AddressBook storage not recognized")
 
     def _prepare_tags(self, tags: List[str] | str) -> List[str]:
+        """
+        Prepare and validate tags.
+        
+        Args:
+            tags: List of tags or comma-separated string
+            
+        Returns:
+            List of normalized tag strings
+            
+        Raises:
+            ValueError: If any tag is invalid
+        """
         if isinstance(tags, str):
             tags = split_tags_string(tags)
         out = []
@@ -401,7 +448,13 @@ class ContactService:
     # --- search by tags ---
     def find_by_tags_all(self, tags: List[str] | str) -> List[Tuple[str, "Record"]]:
         """
-        returns contacts that have *all* specified tags (AND).
+        Find contacts that have all specified tags (AND logic).
+        
+        Args:
+            tags: List of tags or comma-separated string
+            
+        Returns:
+            List of (name, record) tuples with all specified tags
         """
         want = set(self._prepare_tags(tags))
         if not want:
@@ -415,7 +468,13 @@ class ContactService:
 
     def find_by_tags_any(self, tags: List[str] | str) -> List[Tuple[str, "Record"]]:
         """
-        returns contacts that have *at least one* of the specified tags (OR).
+        Find contacts that have at least one of the specified tags (OR logic).
+        
+        Args:
+            tags: List of tags or comma-separated string
+            
+        Returns:
+            List of (name, record) tuples with at least one specified tag
         """
         want = set(self._prepare_tags(tags))
         if not want:
