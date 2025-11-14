@@ -201,6 +201,22 @@ def run_interactive():
 
     ctx = Context(typer.main.get_command(app))
     
+    console.print(Panel(
+        "[bold green]Welcome to the Assistant Bot![/bold green]\n\n"
+        "Available commands:\n"
+        "  • [cyan]hello[/cyan] - Get a greeting\n"
+        "  • [cyan]add[/cyan] [name] [phone] - Add a contact\n"
+        "  • [cyan]change[/cyan] [name] [old_phone] [new_phone] - Change phone number\n"
+        "  • [cyan]delete[/cyan] [name] - Delete a contact\n"
+        "  • [cyan]phone[/cyan] [name] - Show phone numbers\n"
+        "  • [cyan]all[/cyan] - Show all contacts\n"
+        "  • [cyan]add-birthday[/cyan] [name] [DD.MM.YYYY] - Add birthday\n"
+        "  • [cyan]show-birthday[/cyan] [name] - Show birthday\n"
+        "  • [cyan]birthdays[/cyan] - Show upcoming birthdays\n"
+        "  • [cyan]exit[/cyan] or [cyan]quit[/cyan] - Exit the program\n",
+        title="[bold]Assistant Bot[/bold]",
+        border_style="green"
+    ))
     # Create context-aware completer that fixes parameter positioning
     custom_completer = create_context_aware_completer_for_repl(ctx)
     
@@ -224,17 +240,11 @@ def main():
     """
     auto_register_commands()
     
-    # If no arguments provided, launch interactive mode by default
     if len(sys.argv) == 1:
         run_interactive()
     else:
         app()
 
-
 if __name__ == "__main__":
     main()
-
-
-
-
 
