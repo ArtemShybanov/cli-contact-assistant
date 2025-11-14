@@ -21,6 +21,7 @@ import click
 from rich.console import Console
 from rich.panel import Panel
 from src.container import Container
+from src.utils.paths import get_storage_path
 from src.services.contact_service import ContactService
 
 app = typer.Typer(
@@ -31,7 +32,7 @@ app = typer.Typer(
 console = Console()
 
 container = Container()
-container.config.storage.filename.from_value("addressbook.pkl")
+container.config.storage.filename.from_value(str(get_storage_path()))
 
 # Track if container is already wired and commands registered
 _container_wired = False
@@ -182,6 +183,7 @@ def interactive():
     try:
         repl(ctx, prompt_kwargs=prompt_kwargs)
     except (EOFError, KeyboardInterrupt):
+        container.save_data()
         console.print("\n[bold green]Good bye![/bold green]")
 
 
