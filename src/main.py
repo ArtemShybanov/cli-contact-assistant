@@ -212,7 +212,7 @@ def run_interactive():
     _print_welcome_panel()
 
     ctx = Context(typer.main.get_command(app))
-    
+
     # Create context-aware completer that fixes parameter positioning
     custom_completer = create_context_aware_completer_for_repl(ctx)
     
