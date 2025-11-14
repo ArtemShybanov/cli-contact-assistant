@@ -29,8 +29,8 @@ app = typer.Typer(
     help="Console bot assistant for managing contacts with names, phone numbers, and birthdays.",
     add_completion=True,
 )
-console = Console()
 
+console = Console()
 container = Container()
 container.config.storage.filename.from_value("addressbook.pkl")
 
@@ -61,7 +61,7 @@ def _iter_commands() -> list[tuple[str, str]]:
     result.sort(key=lambda x: x[0])
     return result
 
-def _build_welcome_text() -> Tree:
+def _build_menu() -> Tree:
     # name -> help_line
     commands = dict(_iter_commands()) 
 
@@ -133,8 +133,8 @@ def _build_welcome_text() -> Tree:
 
     return root
 
-def _print_welcome_panel() -> None:
-    console.print(_build_welcome_text())
+def _print_menu() -> None:
+    console.print(_build_menu())
 
 def auto_register_commands():
     """
@@ -216,7 +216,7 @@ def interactive():
     from click import Context
     from src.utils.repl_completer import create_context_aware_completer_for_repl
     
-    _print_welcome_panel()
+    _print_menu()
 
     ctx = Context(typer.main.get_command(app))
     
@@ -246,7 +246,7 @@ def run_interactive():
     from click import Context
     from src.utils.repl_completer import create_context_aware_completer_for_repl
 
-    _print_welcome_panel()
+    _print_menu()
 
     ctx = Context(typer.main.get_command(app))
 
