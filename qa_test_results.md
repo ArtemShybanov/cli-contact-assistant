@@ -119,10 +119,10 @@ Group: work
 Bob
 
 CLI показує дерево:
+```
 Address Book
 ├── Alice
 └── Intl
-
 ---
 
 ## ⚠ 4.5 (Medium) Формат birthdays ≠ plain-text з тестів
@@ -131,10 +131,12 @@ No upcoming birthdays
 Факт — modern Rich:
 
 No upcoming birthdays in the next week.
+
+```
 ┏━ Upcoming Birthdays ━┓
 ┃ Soon: 19.11.2025      ┃
 ┗━━━━━━━━━━━━━━━━━━━━━━━┛
-
+```
 ---
 
 # 📒 5. Додаткові спостереження
