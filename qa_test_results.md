@@ -123,6 +123,7 @@ CLI показує дерево:
 Address Book
 ├── Alice
 └── Intl
+```
 ---
 
 ## ⚠ 4.5 (Medium) Формат birthdays ≠ plain-text з тестів
